@@ -1,24 +1,21 @@
-import { Row, Col, Card } from "antd";
-
 import "./App.css";
+
+import { Layout } from "antd";
+
 import Landing from "./components/Landing";
 import TopBar from "./components/TopBar";
 
 function App() {
   return (
-    <div>
-      <TopBar />
-      <Landing />
-
-      <Row>
-        <Col>
-          <Card>bottom left card</Card>
-        </Col>
-        <Col>
-          <Card>bottom right card</Card>
-        </Col>
-      </Row>
-    </div>
+    <Layout
+      className="layout"
+      style={{ minHeight: "100vh", backgroundColor: "#fff" }}
+    >
+      <Layout.Content className="container">
+        <TopBar />
+        <Landing />
+      </Layout.Content>
+    </Layout>
   );
 }
 

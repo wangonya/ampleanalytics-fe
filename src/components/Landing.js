@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
 import {
   AreaChart,
   Area,
@@ -8,7 +9,24 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Button, Row, Col, Card, Select, PageHeader, Statistic } from "antd";
+import {
+  Button,
+  Row,
+  Col,
+  Card,
+  Select,
+  PageHeader,
+  Statistic,
+  Table,
+  Image,
+  Result,
+  Modal,
+  Form,
+  Input,
+} from "antd";
+
+import landing from "../x.png";
+import { useApi } from "../use-api";
 
 const Aggregate = (props) => {
   const [state, setState] = useState([]);
@@ -71,7 +89,7 @@ const Timeseries = (props) => {
   return (
     <Row style={{ padding: "20px 0 20px" }}>
       <Col style={{ width: 900 }}>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={400}>
           <AreaChart
             data={state}
             margin={{
@@ -108,7 +126,154 @@ const Timeseries = (props) => {
   );
 };
 
+const Breakdown = (props) => {
+  const [state, setState] = useState([]);
+  useEffect(() => {
+    fetch(
+      `${process.env.REACT_APP_BE_URL}/analytics/breakdown?period=${props.filter}`
+    )
+      .then((response) => response.json())
+      .then((data) => setState(data))
+      .catch((error) => {
+        console.log("fetch data failed", error);
+      });
+  }, [props]);
+  return (
+    <Row style={{ padding: "20px 0 20px" }} gutter={18}>
+      <Col span={8}>
+        <Card title="Top Consumers">
+          <Table
+            columns={[
+              {
+                title: "Consumer",
+                dataIndex: "consumer",
+                key: "consumer",
+              },
+              {
+                title: "Hits",
+                dataIndex: "hits",
+                key: "hits",
+              },
+            ]}
+            dataSource={state.top_consumers}
+          />
+        </Card>
+      </Col>
+      <Col span={8}>
+        <Card title="Top Platforms">
+          {" "}
+          <Table
+            columns={[
+              {
+                title: "Platform",
+                dataIndex: "platform",
+                key: "platform",
+              },
+              {
+                title: "Hits",
+                dataIndex: "hits",
+                key: "hits",
+              },
+            ]}
+            dataSource={state.top_platforms}
+          />
+        </Card>
+      </Col>
+      <Col span={8}>
+        <Card title="Top User Agents">
+          {" "}
+          <Table
+            columns={[
+              {
+                title: "User Agent",
+                dataIndex: "user_agent",
+                key: "user_agent",
+              },
+              {
+                title: "Hits",
+                dataIndex: "hits",
+                key: "hits",
+              },
+            ]}
+            dataSource={state.top_user_agents}
+          />
+        </Card>
+      </Col>
+    </Row>
+  );
+};
+
+const ProjectCreateForm = ({ visible, onCreate, onCancel }) => {
+  const [form] = Form.useForm();
+  return (
+    <Modal
+      visible={visible}
+      title="Create a new project"
+      okText="Create"
+      cancelText="Cancel"
+      onCancel={onCancel}
+      onOk={() => {
+        form
+          .validateFields()
+          .then((values) => {
+            form.resetFields();
+            onCreate(values);
+          })
+          .catch((info) => {
+            console.log("Validate Failed:", info);
+          });
+      }}
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        name="form_in_modal"
+        initialValues={{
+          modifier: "public",
+        }}
+      >
+        <Form.Item
+          name="name"
+          label="Name"
+          rules={[
+            {
+              required: true,
+              message: "Please input the name of the project",
+            },
+          ]}
+        >
+          <Input />
+        </Form.Item>
+        <Form.Item name="description" label="Description">
+          <Input />
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+};
+
 const Landing = () => {
+  const { isAuthenticated, loginWithRedirect, user } = useAuth0();
+
+  const [createProjectModalvisible, setCreateProjectModalVisible] =
+    useState(false);
+
+  const onCreateProject = (values) => {
+    console.log("Received values of form: ", values);
+    const { loading, error, refresh, data } = useApi("/projects", {
+      audience: "ampleanalyticsapi",
+      method: "POST",
+      body: JSON.stringify(values),
+    });
+    setCreateProjectModalVisible(false);
+  };
+
+  const { loading, error, refresh, data } = useApi("/projects", {
+    audience: "ampleanalyticsapi",
+  });
+  let project = data;
+  console.log('data', data);
+
   const { Option } = Select;
   const [filter, setFilter] = useState(
     localStorage.getItem("filter") || "last_7_days"
@@ -117,30 +282,69 @@ const Landing = () => {
     setFilter(filter);
     localStorage.setItem("filter", filter);
   };
-  return (
-    <div>
-      <PageHeader
-        className="site-page-header-responsive"
-        title="Title"
-        subTitle="This is a subtitle"
-        extra={[
-          <Select
-            defaultValue={filter}
-            style={{ margin: "0 8px", paddingBottom: "10px" }}
-            onChange={onFilterChange}
-          >
-            <Option value="today">Today</Option>
-            <Option value="last_7_days">Last 7 days</Option>
-            <Option value="last_30_days">Last 30 days</Option>
-          </Select>,
-        ]}
-      />
+  return isAuthenticated ? (
+    project ? (
+      <div>
+        <PageHeader
+          title="Title"
+          subTitle="This is a subtitle"
+          extra={[
+            <Select
+              defaultValue={filter}
+              style={{ margin: "0 8px", paddingBottom: "10px" }}
+              onChange={onFilterChange}
+            >
+              <Option value="today">Today</Option>
+              <Option value="last_7_days">Last 7 days</Option>
+              <Option value="last_30_days">Last 30 days</Option>
+            </Select>,
+          ]}
+        />
 
-      <Card>
-        <Aggregate filter={filter} />
-        <Timeseries filter={filter} />
-      </Card>
-    </div>
+        <Card>
+          <Aggregate filter={filter} />
+          <Timeseries filter={filter} />
+        </Card>
+        <Breakdown filter={filter} />
+      </div>
+    ) : (
+      <div>
+        <Result
+          status="404"
+          title="No Projects Found"
+          subTitle="You don't have any projects yet."
+          extra={
+            <Button
+              type="primary"
+              onClick={() => {
+                setCreateProjectModalVisible(true);
+              }}
+            >
+              Create Project
+            </Button>
+          }
+        />
+        <ProjectCreateForm
+          visible={createProjectModalvisible}
+          onCreate={onCreateProject}
+          onCancel={() => {
+            setCreateProjectModalVisible(false);
+          }}
+        />
+      </div>
+    )
+  ) : (
+    <Row>
+      <Col style={{ padding: "20px" }} span={8}>
+        <h2 className="headline">Simple analytics for your backend APIs</h2>
+        <Button type="primary" onClick={() => loginWithRedirect()}>
+          Get Started
+        </Button>
+      </Col>
+      <Col span={16}>
+        <Image src={landing} preview={false} />
+      </Col>
+    </Row>
   );
 };
 
